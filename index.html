@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BYBTRANS — Real-Time AI Video</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #080a0f;
+    --surface: #0e1117;
+    --panel: #131720;
+    --border: #1e2535;
+    --accent: #00f0ff;
+    --accent2: #7b4fff;
+    --live: #00e87a;
+    --text: #e8eaf0;
+    --muted: #5a6280;
+    --danger: #ff4466;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .logo span {
+    font-weight: 400;
+    opacity: 0.6;
+    font-size: 0.75rem;
+    display: block;
+    letter-spacing: 0.2em;
+    background: none;
+    -webkit-text-fill-color: var(--muted);
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 0.75rem;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.08em;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+
+  .status-dot.live { background: var(--live); box-shadow: 0 0 8px var(--live); animation: pulse 1.5s infinite; }
+  .status-dot.connecting { background: #ffaa00; animation: pulse 0.8s infinite; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* MAIN LAYOUT */
+  main {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    grid-template-rows: 1fr auto;
+    gap: 0;
+    height: calc(100vh - 65px);
+  }
+
+  /* VIDEO SECTION */
+  .video-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border-right: 1px solid var(--border);
+  }
+
+  .video-pane {
+    background: var(--bg);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .video-pane video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .pane-label {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: rgba(8,10,15,0.75);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .pane-label.transformed {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .video-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    color: var(--muted);
+    text-align: center;
+    padding: 32px;
+  }
+
+  .video-placeholder svg {
+    opacity: 0.3;
+  }
+
+  .video-placeholder p {
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-section {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-section:last-child {
+    border-bottom: none;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  /* API KEY INPUT */
+  .input-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  input[type="text"], input[type="password"] {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="text"]:focus, input[type="password"]:focus {
+    border-color: var(--accent);
+  }
+
+  /* BUTTONS */
+  .btn {
+    padding: 10px 18px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #000;
+  }
+
+  .btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-ghost {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-danger {
+    background: transparent;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+  }
+
+  .btn-danger:hover { background: var(--danger); color: #fff; }
+
+  .btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-full { width: 100%; }
+
+  /* START / STOP ROW */
+  .control-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* PROMPT INPUT */
+  .prompt-area {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .prompt-input-wrap {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  textarea {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.85rem;
+    resize: none;
+    outline: none;
+    line-height: 1.5;
+    transition: border-color 0.2s;
+    min-height: 72px;
+  }
+
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--muted); }
+
+  /* QUICK EDITS */
+  .quick-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+  }
+
+  .quick-btn {
+    padding: 9px 10px;
+    border-radius: 8px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 0.75rem;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    font-family: 'Space Grotesk', sans-serif;
+    line-height: 1.4;
+  }
+
+  .quick-btn:hover {
+    border-color: var(--accent2);
+    color: var(--accent);
+    background: rgba(123,79,255,0.08);
+  }
+
+  .quick-btn.active {
+    border-color: var(--accent);
+    background: rgba(0,240,255,0.08);
+    color: var(--accent);
+  }
+
+  .quick-btn span {
+    display: block;
+    font-size: 1rem;
+    margin-bottom: 3px;
+  }
+
+  /* ACTIVE PROMPT DISPLAY */
+  .active-prompt {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(0,240,255,0.06);
+    border: 1px solid rgba(0,240,255,0.2);
+    border-radius: 8px;
+    font-size: 0.78rem;
+  }
+
+  .active-prompt.visible { display: flex; }
+
+  .active-prompt-text {
+    flex: 1;
+    color: var(--accent);
+    font-style: italic;
+  }
+
+  .clear-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .clear-btn:hover { color: var(--danger); }
+
+  /* LOG */
+  .log-area {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .log-entry {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(30,37,53,0.5);
+    display: flex;
+    gap: 10px;
+  }
+
+  .log-entry .time { color: var(--accent2); opacity: 0.7; flex-shrink: 0; }
+  .log-entry.success .msg { color: var(--live); }
+  .log-entry.error .msg { color: var(--danger); }
+  .log-entry.info .msg { color: var(--accent); }
+
+  /* CUSTOM QUICK EDIT FORM */
+  .add-quick {
+    display: flex;
+    gap: 7px;
+    margin-top: 10px;
+  }
+
+  .add-quick input {
+    font-size: 0.78rem;
+    padding: 8px 12px;
+  }
+
+  .add-quick .btn {
+    padding: 8px 14px;
+    font-size: 0.78rem;
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* LOADING OVERLAY */
+  .connecting-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(8,10,15,0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 14px;
+    backdrop-filter: blur(4px);
+  }
+
+  .connecting-overlay.visible { display: flex; }
+
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .connecting-overlay p {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  /* ERROR TOAST */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--panel);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-family: 'Space Mono', monospace;
+    transition: transform 0.3s ease;
+    z-index: 999;
+    max-width: 420px;
+    text-align: center;
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .video-section { height: 50vw; min-height: 240px; }
+    .sidebar { height: auto; max-height: 60vh; overflow-y: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    BYBTRANS
+    <span>REAL-TIME AI VIDEO</span>
+  </div>
+  <div class="status-pill">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">OFFLINE</span>
+  </div>
+</header>
+
+<main>
+  <!-- VIDEO FEEDS -->
+  <div class="video-section">
+    <div class="video-pane">
+      <div class="video-placeholder" id="localPlaceholder">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.89L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+        <p>Your webcam feed<br>will appear here</p>
+      </div>
+      <video id="localVideo" autoplay muted playsinline style="display:none"></video>
+      <div class="pane-label">ORIGINAL</div>
+    </div>
+
+    <div class="video-pane">
+      <div class="video-placeholder" id="remotePlaceholder">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        <p>AI-transformed video<br>will stream here</p>
+      </div>
+      <video id="remoteVideo" autoplay playsinline style="display:none"></video>
+      <div class="pane-label transformed">TRANSFORMED</div>
+      <div class="connecting-overlay" id="connectingOverlay">
+        <div class="spinner"></div>
+        <p>CONNECTING TO DECART...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- API KEY -->
+    <div class="sidebar-section">
+      <div class="section-label">Decart API Key</div>
+      <div class="input-row">
+        <input type="password" id="apiKeyInput" placeholder="dct_...your key here" autocomplete="off">
+        <button class="btn btn-ghost" onclick="toggleKeyVisibility()" id="eyeBtn" title="Show/hide">👁</button>
+      </div>
+    </div>
+
+    <!-- START / STOP -->
+    <div class="sidebar-section">
+      <div class="section-label">Session</div>
+      <div class="control-row">
+        <button class="btn btn-primary" id="startBtn" onclick="startSession()" style="flex:1">▶ Start</button>
+        <button class="btn btn-danger" id="stopBtn" onclick="stopSession()" disabled>■ Stop</button>
+      </div>
+    </div>
+
+    <!-- CURRENT PROMPT -->
+    <div class="sidebar-section">
+      <div class="section-label">Active Edit</div>
+      <div class="active-prompt" id="activePromptDisplay">
+        <div class="active-prompt-text" id="activePromptText">None</div>
+        <button class="clear-btn" onclick="clearPrompt()" title="Clear edit">✕</button>
+      </div>
+      <div style="margin-top:10px">
+        <div class="prompt-area">
+          <textarea id="promptInput" placeholder="Describe your edit e.g. 'Change shirt to red', 'Add sunglasses', 'Replace background with jungle'..." rows="3"></textarea>
+          <button class="btn btn-primary btn-full" id="applyBtn" onclick="applyPrompt()" disabled>Apply Edit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUICK EDITS -->
+    <div class="sidebar-section">
+      <div class="section-label">Quick Edits</div>
+      <div class="quick-grid" id="quickGrid">
+        <button class="quick-btn" onclick="quickEdit(this, 'Change the shirt to red')"><span>👕</span>Red Shirt</button>
+        <button class="quick-btn" onclick="quickEdit(this, 'Add sunglasses to the person')"><span>🕶️</span>Sunglasses</button>
+        <button class="quick-btn" onclick="quickEdit(this, 'Replace the background with a tropical beach')"><span>🏖️</span>Beach BG</button>
+        <button class="quick-btn" onclick="quickEdit(this, 'Add a futuristic neon city background')"><span>🌆</span>Neon City</button>
+        <button class="quick-btn" onclick="quickEdit(this, 'Make the person look like an anime character')"><span>✨</span>Anime Style</button>
+        <button class="quick-btn" onclick="quickEdit(this, 'Add a hat to the person')"><span>🎩</span>Add Hat</button>
+        <button class="quick-btn" onclick="quickEdit(this, 'Change the background to a studio with soft lighting')"><span>💡</span>Studio BG</button>
+        <button class="quick-btn" onclick="quickEdit(this, 'Add a beard to the person')"><span>🧔</span>Add Beard</button>
+      </div>
+      <div class="add-quick">
+        <input type="text" id="customQuickLabel" placeholder="Label">
+        <input type="text" id="customQuickPrompt" placeholder="Prompt text">
+        <button class="btn btn-ghost" onclick="addQuickEdit()">+</button>
+      </div>
+    </div>
+
+    <!-- LOG -->
+    <div class="sidebar-section" style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
+      <div class="section-label">Activity Log</div>
+      <div class="log-area" id="logArea"></div>
+    </div>
+
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ─── State ───────────────────────────────────────────────────────────────────
+  let decartClient = null;
+  let realtimeClient = null;
+  let localStream = null;
+  let isConnected = false;
+
+  // ─── Logging ─────────────────────────────────────────────────────────────────
+  function log(msg, type = 'default') {
+    const area = document.getElementById('logArea');
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    entry.innerHTML = `<span class="time">${time}</span><span class="msg">${msg}</span>`;
+    area.appendChild(entry);
+    area.scrollTop = area.scrollHeight;
+  }
+
+  // ─── Toast ───────────────────────────────────────────────────────────────────
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 4000);
+  }
+
+  // ─── Status ──────────────────────────────────────────────────────────────────
+  function setStatus(state) {
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    dot.className = 'status-dot';
+    if (state === 'live') { dot.classList.add('live'); text.textContent = 'LIVE'; }
+    else if (state === 'connecting') { dot.classList.add('connecting'); text.textContent = 'CONNECTING'; }
+    else { text.textContent = 'OFFLINE'; }
+  }
+
+  // ─── Toggle API key visibility ───────────────────────────────────────────────
+  function toggleKeyVisibility() {
+    const input = document.getElementById('apiKeyInput');
+    input.type = input.type === 'password' ? 'text' : 'password';
+  }
+
+  // ─── Start Session ───────────────────────────────────────────────────────────
+  async function startSession() {
+    const apiKey = document.getElementById('apiKeyInput').value.trim();
+    if (!apiKey) { showToast('Please enter your Decart API key first.'); return; }
+
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('connectingOverlay').classList.add('visible');
+    setStatus('connecting');
+    log('Requesting camera access...', 'info');
+
+    try {
+      // Load Decart SDK dynamically
+      if (!window.decartSdkLoaded) {
+        log('Loading Decart SDK...', 'info');
+        await loadScript('https://cdn.jsdelivr.net/npm/@decartai/sdk/dist/index.umd.js');
+        window.decartSdkLoaded = true;
+        log('SDK loaded', 'success');
+      }
+
+      // Get camera
+      const { createDecartClient, models } = window.DecartAI || window.decartai || window;
+
+      const model = models.realtime('lucy-2.1');
+
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: { frameRate: model.fps || 30, width: model.width || 1280, height: model.height || 720 },
+        audio: false
+      });
+
+      // Show local video
+      const localVideo = document.getElementById('localVideo');
+      localVideo.srcObject = localStream;
+      localVideo.style.display = 'block';
+      document.getElementById('localPlaceholder').style.display = 'none';
+      log('Camera connected', 'success');
+
+      // Connect to Decart
+      log('Connecting to Decart realtime...', 'info');
+      decartClient = createDecartClient({ apiKey });
+
+      realtimeClient = await decartClient.realtime.connect(localStream, {
+        model,
+        mirror: 'auto',
+        onRemoteStream: (editedStream) => {
+          const remoteVideo = document.getElementById('remoteVideo');
+          remoteVideo.srcObject = editedStream;
+          remoteVideo.style.display = 'block';
+          document.getElementById('remotePlaceholder').style.display = 'none';
+          document.getElementById('connectingOverlay').classList.remove('visible');
+          setStatus('live');
+          isConnected = true;
+          log('Decart stream live ✓', 'success');
+          document.getElementById('applyBtn').disabled = false;
+          document.getElementById('stopBtn').disabled = false;
+        }
+      });
+
+      realtimeClient.on('connectionChange', (state) => {
+        log(`Connection: ${state}`);
+        if (state === 'disconnected') { handleDisconnect(); }
+      });
+
+      realtimeClient.on('error', (err) => {
+        log(`Error: ${err.message || err}`, 'error');
+        showToast(`Decart error: ${err.message || err}`);
+      });
+
+    } catch (err) {
+      log(`Failed: ${err.message}`, 'error');
+      showToast(`Could not start: ${err.message}`);
+      document.getElementById('connectingOverlay').classList.remove('visible');
+      document.getElementById('startBtn').disabled = false;
+      setStatus('offline');
+    }
+  }
+
+  // ─── Stop Session ────────────────────────────────────────────────────────────
+  function stopSession() {
+    if (realtimeClient) { try { realtimeClient.disconnect(); } catch(e) {} }
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); }
+    handleDisconnect();
+    log('Session ended by user');
+  }
+
+  function handleDisconnect() {
+    isConnected = false;
+    realtimeClient = null;
+    decartClient = null;
+    localStream = null;
+    setStatus('offline');
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
+    document.getElementById('applyBtn').disabled = true;
+    document.getElementById('localVideo').style.display = 'none';
+    document.getElementById('remoteVideo').style.display = 'none';
+    document.getElementById('localPlaceholder').style.display = 'flex';
+    document.getElementById('remotePlaceholder').style.display = 'flex';
+    document.getElementById('connectingOverlay').classList.remove('visible');
+    document.getElementById('activePromptDisplay').classList.remove('visible');
+    document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+  }
+
+  // ─── Apply Prompt ─────────────────────────────────────────────────────────────
+  function applyPrompt() {
+    const text = document.getElementById('promptInput').value.trim();
+    if (!text) { showToast('Enter an edit prompt first.'); return; }
+    if (!realtimeClient || !isConnected) { showToast('Not connected yet.'); return; }
+
+    realtimeClient.setPrompt(text);
+    document.getElementById('activePromptText').textContent = text;
+    document.getElementById('activePromptDisplay').classList.add('visible');
+    document.getElementById('promptInput').value = '';
+    document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+    log(`Edit applied: "${text}"`, 'info');
+  }
+
+  // ─── Quick Edit ──────────────────────────────────────────────────────────────
+  function quickEdit(btn, prompt) {
+    if (!realtimeClient || !isConnected) {
+      showToast('Start a session first.');
+      return;
+    }
+    realtimeClient.setPrompt(prompt);
+    document.getElementById('activePromptText').textContent = prompt;
+    document.getElementById('activePromptDisplay').classList.add('visible');
+    document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    log(`Quick edit: "${prompt}"`, 'info');
+  }
+
+  // ─── Clear Prompt ────────────────────────────────────────────────────────────
+  function clearPrompt() {
+    if (realtimeClient && isConnected) {
+      realtimeClient.setPrompt('');
+      log('Edit cleared — showing raw feed');
+    }
+    document.getElementById('activePromptDisplay').classList.remove('visible');
+    document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+  }
+
+  // ─── Add Custom Quick Edit ───────────────────────────────────────────────────
+  function addQuickEdit() {
+    const label = document.getElementById('customQuickLabel').value.trim();
+    const prompt = document.getElementById('customQuickPrompt').value.trim();
+    if (!label || !prompt) { showToast('Enter both a label and a prompt.'); return; }
+
+    const grid = document.getElementById('quickGrid');
+    const btn = document.createElement('button');
+    btn.className = 'quick-btn';
+    btn.innerHTML = `<span>✏️</span>${label}`;
+    btn.onclick = function() { quickEdit(this, prompt); };
+    grid.appendChild(btn);
+
+    document.getElementById('customQuickLabel').value = '';
+    document.getElementById('customQuickPrompt').value = '';
+    log(`Quick edit added: "${label}"`, 'success');
+  }
+
+  // ─── Enter key on prompt ──────────────────────────────────────────────────────
+  document.getElementById('promptInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); applyPrompt(); }
+  });
+
+  // ─── Load script helper ──────────────────────────────────────────────────────
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error(`Failed to load ${src}`));
+      document.head.appendChild(s);
+    });
+  }
+
+  // ─── Init log ────────────────────────────────────────────────────────────────
+  log('BYBTRANS ready. Enter API key and press Start.');
+</script>
+</body>
+</html>
